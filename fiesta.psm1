@@ -1,11 +1,41 @@
-###########################################################
-Add-Type -AssemblyName microsoft.VisualBasic
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+# This file contains the public routines for the module.  All supporting reoutines are included
+# at the end following the export statement.
+
 
 ###########################################################
+# Initailize-Script uses this to call AppActivate().  When IE launches, input focus is not always
+# properly established.  fIEsta resorts to the equivalent of clicking IE and typing a key to get
+# it in the right state to start.
+Add-Type -AssemblyName microsoft.VisualBasic
+
+###########################################################
+#  this is used to call SendKeys()
+Add-Type -AssemblyName System.Windows.Forms
+
+###########################################################
+# This is used for finding IE windows
 $shell = New-Object -comObject Shell.Application
-$jpegCodec = [Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.FormatDescription -eq "JPEG" }
+
 $trace = $false
 $logDir = "$pwd\log"
 $logFileName = ""
@@ -13,34 +43,18 @@ $showHtmlLog = $true
 $autoSnap = $true
 $sectionOutput = $null
 
-###########################################################
-Set-Alias banner Write-Banner
-function Write-Banner( $url)
-{
-	$strComputer = gc env:computername;
-
-	$ieversion = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Internet Explorer').Version
-#	$colItems = get-wmiobject -class "MicrosoftIE_Summary" -namespace "root\CIMV2\Applications\MicrosoftIE" `
-#	-computername $strComputer
-
-	$objItem = @($colItems)[0];
-	write-host "###########################################################"  	-foregroundcolor White -backgroundcolor DarkGreen	
-	write-host "# Date:           " (Get-Date)		  						 	-foregroundcolor White -backgroundcolor DarkGreen	
-	write-host "# Computer:       " $strComputer								-foregroundcolor White -backgroundcolor DarkGreen	
-	write-host "# Version:        " $ieversion									-foregroundcolor White -backgroundcolor DarkGreen	
-	write-host "# URL:            " $url										-foregroundcolor White -backgroundcolor DarkGreen	
-	write-host "###########################################################"	-foregroundcolor White -backgroundcolor DarkGreen	
-	
-	Add-HtmlLogEntry -t 'bannerStart'
-	Add-HtmlLogEntry -t 'bannerEntry' -label "Date" -value (Get-Date)
-	Add-HtmlLogEntry -t 'bannerEntry' -label "Computer" -value $strComputer
-	Add-HtmlLogEntry -t 'bannerEntry' -label "IE Version" -value $ieversion
-	Add-HtmlLogEntry -t 'bannerEntry' -label "URL" -value $url
-	Add-HtmlLogEntry -t 'bannerEnd' 
-	Write-HtmlLog
-}
 
 ###########################################################
+<#  
+.SYNOPSIS  
+
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias initialize Initialize-Script
 function Initialize-Script
 {
@@ -72,7 +86,7 @@ function Initialize-Script
 	Add-HtmlLogEntry -t 'start' 
 	Write-HtmlLog
 	
-	banner $url
+	Write-Banner $url
 	
 	section "Initialize"
 	
@@ -88,6 +102,31 @@ function Initialize-Script
 				$win.quit();
 			}
 		}
+		
+		# wait until they are all closed
+		$try = 0;
+		$allClosed = $false
+		do 
+		{
+			$allClosed = $true
+			foreach( $win in @($shell.windows()))
+			{
+				if( $win -and ($win.path -match "Internet Explorer"))
+				{
+					write-host "IE still closing"
+					$allClosed = $false
+				}
+			}
+			
+			$try ++
+			if ($try -gt 60) 
+			{
+				break;
+			}
+			
+			Start-Sleep -milliseconds 500
+		} 
+		while (!$allClosed)
 	}
 	
 	# Create an ie com object
@@ -95,43 +134,86 @@ function Initialize-Script
 	$ie = New-Object -com internetexplorer.application
 	$ie.top = 0
 	$ie.left = 0
-	$ie.navigate( "about:blank")
 	$ie.visible = $true 
 	$script:ie = $ie
 	$script:mainHandle = $ie.hwnd
+
+	# Wait for IE to fully launch
+	Start-Sleep -milliseconds 500
+	$script:proc = Get-Process | where {$_.mainwindowtitle -eq "Windows Internet Explorer"}		
+	
+	if( $script:proc)
+	{
+		#$script:proc | gm
+		# For some unknown reason IE dosen't always get focus so force it.
+		[void]$script:proc.waitForInputIdle()
+		Start-Sleep -milliseconds 500
+		
+		#TODO put this in front of every sendkeys call
+		[Microsoft.VisualBasic.Interaction]::AppActivate( $script:proc.mainwindowtitle)
+	}
+
 }
 
 ###########################################################
+<#  
+.SYNOPSIS  
+
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias pause Set-PauseScript
 function Set-PauseScript( $title)
 {
 	Write-Host "Press any key to continue ..."
-	$x = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+	[void]$host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
 
 ###########################################################
+<#  
+.SYNOPSIS  
+
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias selectTab Select-BrowserTab
 function Select-BrowserTab( $title)
 {
 	$try = 0
 	$ie2 = $null
 	
-	write-host "Search for handle $mainHandle with text '$title'"
+	$script:testScript = $MyInvocation.ScriptName.split("\")[-1].split(".")[0]
+	$script:testLine = $MyInvocation.ScriptLineNumber
+	$script:cmdLine = $MyInvocation.Line
+	
+	trace "Search for handle $mainHandle with text '$title'"
 	
 	# There is a separate browser com object for each tab
 	# find the explorer instance that matches the given title
 	do 
 	{
-		Start-Sleep -milliseconds 500
-		
 		foreach( $win in @($shell.windows()))
 		{
-			write-host "Testing $($win.hwnd) '$($win.locationName)'"
+			trace "Testing $($win.hwnd) '$($win.locationName)' '$($win.locationUrl)'"
 			if(($win.hwnd -eq $mainHandle) -and ($win.locationName -like $title))
 			{
 				$ie2 = $win
-				#break;
-				write-host "found '$title' at $mainHandle"
+				trace "found '$title' at $mainHandle"
+				break;
+			}
+			if(($win.hwnd -eq $mainHandle) -and ($win.locationUrl -eq $title))
+			{
+				$ie2 = $win
+				trace "found '$title' at $mainHandle"
+				break;
 			}
 		}
 		
@@ -139,6 +221,10 @@ function Select-BrowserTab( $title)
 		if ($try -gt 2) #60) 
 		{
 			break;
+		}
+		else
+		{
+			Start-Sleep -milliseconds 500
 		}
 	} 
 	while ($ie2 -eq $null)
@@ -149,9 +235,16 @@ function Select-BrowserTab( $title)
 		$ie2.visible = $true 
 		$script:ie = $ie2
 		waitForIE
-		Select-IETab $ie $title | out-null
-	
-		Write-TestResult $true 		
+		
+		trace "bring '$($ie.document.title)' to the front"
+		if( Select-IETab $ie $ie.document.title )
+		{
+			Write-TestResult $true 		
+		}
+		else
+		{
+			Write-TestResult $false 		
+		}
 	}
 	else
 	{
@@ -160,6 +253,16 @@ function Select-BrowserTab( $title)
 }
 
 ###########################################################
+<#  
+.SYNOPSIS  
+
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias finalize Show-Summary
 function Show-Summary
 {
@@ -173,14 +276,87 @@ function Show-Summary
 }
 
 ###########################################################
+<#  
+.SYNOPSIS  
+
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias visit Set-BrowserLocation
-function Set-BrowserLocation( $url)
+function Set-BrowserLocation
 {
-	$ie.navigate( $url)
+	param( [alias("l")]  $url=$null,
+		   [alias("u")]  $user=$null,
+		   [alias("p")]  $pass=$null,
+		   [alias("n")]  [switch]$newTab
+		 )
+		 
+	if( $newTab)
+	{
+		$ie.navigate2( $url, 2048)
+		waitForIE
+		selectTab $url
+	}
+	else
+	{	
+		$ie.navigate( $url)
+	}
+
+	if( $user)
+	{
+		$keys = "$user"
+		wait 
+		#Send-Keys("$user{TAB}$pass{ENTER}") # only works when sent as a single string
+		Start-Sleep -milliseconds 500
+		
+		if( $pass)
+		{
+			$keys += "{TAB}$pass"
+		}
+		
+		$keys += "{ENTER}"
+		trace "Sending key string '$keys'"
+		Send-Keys( $keys) 
+	}
+	
+	waitForIE
+	#[System.Windows.Forms.SendKeys]::SendWait("1")
+}
+
+###########################################################
+<#  
+.SYNOPSIS  
+
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
+Set-Alias sendKeys Send-Keys
+function Send-Keys( $keys)
+{
+	[Microsoft.VisualBasic.Interaction]::AppActivate( $script:proc.mainwindowtitle)
+	[System.Windows.Forms.SendKeys]::SendWait( $keys)
 	waitForIE
 }
 
 ###########################################################
+<#  
+.SYNOPSIS  
+
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias section Set-TestName
 function Set-TestName( $name)
 {
@@ -199,18 +375,16 @@ function Set-TestName( $name)
 }
 
 ###########################################################
-Set-Alias waitForIE Wait-IEBusy
-function Wait-IEBusy
-{
-	# busy loop for any time ie is loading a page
-	while( $ie.Busy -eq $true)
-	{
-		trace "IE is busy..."
-		Start-Sleep -Milliseconds 500
-	}
-}
+<#  
+.SYNOPSIS  
 
-###########################################################
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias refresh Send-BrowserRefresh
 function Send-BrowserRefresh
 {
@@ -219,6 +393,16 @@ function Send-BrowserRefresh
 }
 
 ###########################################################
+<#  
+.SYNOPSIS  
+
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias back Send-BrowserBack
 function Send-BrowserBack
 {
@@ -227,6 +411,16 @@ function Send-BrowserBack
 }
 
 ###########################################################
+<#  
+.SYNOPSIS  
+
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias forward Send-BrowserForward
 function Send-BrowserForward
 {
@@ -235,6 +429,16 @@ function Send-BrowserForward
 }
 
 ###########################################################
+<#  
+.SYNOPSIS  
+
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias resize Set-BrowserSize
 function Set-BrowserSize
 {
@@ -256,6 +460,16 @@ function Set-BrowserSize
 }
 
 ###########################################################
+<#  
+.SYNOPSIS  
+
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias waitForText Wait-Text
 Set-Alias wait Wait-Text
 function Wait-Text
@@ -336,6 +550,16 @@ function Wait-Text
 
 
 ###########################################################
+<#  
+.SYNOPSIS  
+
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias waitNo Wait-NoText
 function Wait-NoText
 {
@@ -395,227 +619,17 @@ function Wait-NoText
 	Write-TestResult ($el -eq $null)
 }
 
-function getProperty( [System.__ComObject]$obj, [string]$prop)
-{
-	[System.__ComObject].InvokeMember( $prop, [System.Reflection.BindingFlags]::GetProperty, $null, $obj, $null)
-}
-
 ###########################################################
-<#
-	findElement "Login"   
-					search for "Login" as innerText of common tags, 
-					then ID value of any element 
-					then name value of any element
-					??? then value of any attr of any element
-					
-	findElement -text "Login"   
-	findElement -text "Login" -id "btn1"  
-	findElement -text "Login" -name "button1"
-	findElement -text "Next" -attr "title" -attrValue "Press to continue"  
-	
-	findElement "Login" -attr "title"
-					search for any element where the title attribute is "Login"
-					and the innerText is "Login"
-					
-	findElement "Login" -tag "div"
-					search for DIV element where the innerText is "Login"
-					
-	findElement "Login" -attr "title" -tag "div"
-					search for DIV element where the title attribute is "Login"
-					
-	findElement -tag "div"
-					search for the first DIV element
-#>
-Set-Alias findElement Find-Element
-function Find-Element
-{
-	param( [alias("t")]  [string]$text=$null,
-		   [alias("i")]  [string]$id=$null,
-		   [alias("n")]  [string]$name=$null,
-		   [alias("a")]  [string]$attr=$null,
-		   [alias("av")] [string]$attrValue=$null,
-		   [alias("tg")] [string]$tag=$null,
-		   [alias("rt")] [string]$rootTag=$null,
-		   [alias("ra")] [string]$rootAttr=$null,
-		   [alias("rav")][string]$rootAttrValue=$null
-		   )
-		   
-	if( $rootTag -or $rootAttr)
-	{
-		trace "Searching for root element tag='$rootTag' attr $rootAttr='$rootAttrValue'."
-		# search for the root element
-		$root = findElement -av $rootAttrValue -a $rootAttr -tag $rootTag
-		
-		if( !$root)
-		{
-			# error
-			write-comment "$($testScript):$testLine Failed to find root element." -type "error"
-		}
-		else
-		{
-			trace "findElement root element is $($root.tagName) id='$($root.id)'."
-		}
-	}
-	
-	if( !$root)
-	{
-		# search the whole page
-		trace "searching entire DOM"
-		$root = $ie.document
-	}
-	
-	if( $attr -and ($attr -eq "class"))
-	{
-		# class doen't work - use className instead
-		$attr = "className"
-	}
-	
-	if( $id)
-	{
-		trace "findElement searching for id = '$id'."
-		$el = $ie.document.getElementByID( $id)
-	}
-	elseif( $attr -and ($attr -eq "id"))
-	{
-		# shortcut for id searches - should be faster than the generic on below
-		trace "findElement searching for attr $attr = '$attrValue'."
-		$el = $ie.document.getElementByID( $attrValue)
-	}
-	elseif( $name)
-	{
-		trace "findElement searching for name = '$name'."
-		$el = @($ie.document.getElementsByName( $name))[0]
-	}
-	elseif( $attr -and ($attr -eq "name"))
-	{
-		# shortcut for name searches - should be faster than the generic on below
-		$el = @($ie.document.getElementsByName( $attrValue))[0]
-	}
-	elseif( $tag)
-	{
-		$items = $root.getElementsByTagName( $tag)
-		$count = @($items).length
-		
-		if( $attr)
-		{
-			# qualify search by tag and attr
-			trace "findElement searching $count $tag elements for attr $attr = '$attrValue'."
-			foreach( $i in $items)
-			{ 
-				if( (getProperty $i $attr) -eq $attrValue) 
-				{
-					$el = $i
-					break
-				}
-			}
-		}
-		elseif( $text)
-		{
-			# qualify search by tag and innerText
-			trace "findElement searching $count $tag elements for text = '$text'."
-			foreach( $i in $items)
-			{ 
-				if( $i.innerText -eq $text) 
-				{
-					$el = $i
-					break
-				}
-			}
-		}
-		else
-		{
-			# qualify search by tag only
-			trace "findElement $tag found $count elements."
-			if( $items.length)
-			{
-				$el = $items[0];
-			}
-		}
-	}
-	else
-	{
-		if( $attr)
-		{
-			# qualify search by attribute only
-			$items = $root.getElementsByTagName('*')
-			$count = @($items).length
-			
-			trace "findElement searching $count elements for attr $attr = '$attrValue'."
-			foreach( $i in $items)
-			{ 
-				$tmpTag = $i.tagName
-				$tmpAttr = getProperty $i $attr
-				#trace "testing $tmpTag for attr $attr does '$tmpAttr' = $attrValue"
-				
-				if( $tmpAttr -eq $attrValue) 
-				{
-					$el = $i
-					break
-				}
-			}
-		}
-		elseif( $text)
-		{
-			trace "findElement by '$text' alone."
-			# search by innerText, id, name
-			$tags = @( "input", "button", "a", "select", "option", "div", "td", "li", "span")
-			
-			foreach( $tag in $tags)
-			{
-				$items = $root.getElementsByTagName( $tag)
-				
-				foreach( $i in $items)
-				{ 
-					$textVal = ''
-					
-					if( $tag -eq "input")
-					{
-						$textVal = $i.value
-					}
-					else
-					{
-						$textVal = $i.innerText
-					}
-					
-					#trace "testing $tag element with text '$textVal' against '$text'"
-					if( $textVal -like $text) 
-					{
-						$el = $i
-						break
-					}
-				}
-				
-				if( $el)
-				{
-					break;
-				}
-			}
-			
-			# is it an id attribute
-			if( !$el)
-			{
-				$el = $ie.document.getElementByID( $text)
-			}
-			
-			# is it a name attribute
-			if( !$el)
-			{
-				$el = @($ie.document.getElementsByName( $text))[0]
-			}
-		}
-		else
-		{
-			# error
-			Write-Comment "findElement bad combination of params." -type "error"
-		}
-	}
-	
-	# using 'return $el' causes powershell to 'unroll' enumerable objects
-	# using ',$el' foils the unrolling business
-	,$el
-}
+<#  
+.SYNOPSIS  
 
-###########################################################
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias click Send-Click
 function Send-Click
 {		   
@@ -648,7 +662,7 @@ function Send-Click
 	
 	if( !$el)
 	{
-		trace "no matching element found"
+		trace "click() - no matching element found"
 	}
 	
 	if( $el)
@@ -698,26 +712,45 @@ function Send-Click
 				[void]$el.fireEvent( "onmouseup")
 				Start-Sleep -milliseconds 50
 			}
-			catch {}
-			
-			try 
+			catch 
 			{
-				if( !$double)
+				trace "fireEvent threw an error"
+			}
+			
+			#$el.focus()
+			
+			if( !$double)
+			{
+				try 
 				{
 					$el.click()
+					#[void]$el.fireEvent( "click")
 				}
-				else
+				catch 
+				{
+					trace "click threw an error"
+				}
+			}
+			else
+			{
+				try 
 				{
 					[void]$el.fireEvent( "ondblclick")
 				}
+				catch 
+				{
+					trace "fireEvent ondblclick threw an error"
+				}
 			}
-			catch {}
 			
 			try 
 			{
 				[void]$el.fireEvent( "onmouseout")
 			}
-			catch {}
+			catch 
+			{
+				trace "fireEvent onmouseout threw an error"
+			}
 		}
 
 		waitForIE
@@ -735,20 +768,36 @@ function Send-Click
 }
 
 ###########################################################
+<#  
+.SYNOPSIS  
+
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias fill Set-ElementValue
-function Set-ElementValue( $id, $val)
+function Set-ElementValue #( $id, $val)
 {
+ 	param( [alias("i"  )][string]$id=$null,
+		   [alias("t"  )][string]$text=$null,
+		   [alias("n"  )][string]$name=$null,
+		   [alias("a"  )][string]$attr=$null,
+		   [alias("av" )][string]$attrValue=$null,
+		   [alias("tg" )][string]$tag=$null,
+		   [alias("rt" )][string]$rootTag=$null,
+		   [alias("ra" )][string]$rootAttr=$null,
+		   [alias("rav")][string]$rootAttrValue=$null
+		  )
+			
 	$result = $true
 	$script:testScript = $MyInvocation.ScriptName.split("\")[-1].split(".")[0]
 	$script:testLine = $MyInvocation.ScriptLineNumber
 	$script:cmdLine = $MyInvocation.Line
-
-	$el = findElement -id $id
-	
-	if( !$el)
-	{
-		$el = findElement -name $id
-	}
+	trace "call findElement"
+	$el = findElement $null $id $name $attr $attrValue $tag $rootTag $rootAttr $rootAttrValue
 	
 	# see if id is adjacent text
 	if( !$el)
@@ -789,7 +838,7 @@ function Set-ElementValue( $id, $val)
 
 	if( $el)
 	{
-		trace "setting $($el.tagName) id='$($el.id)' name='$($el.name)' to '$val'"
+		trace "setting $($el.tagName) id='$($el.id)' name='$($el.name)' to '$text'"
 		
 		if( $el.tagName -eq "select")
 		{
@@ -797,7 +846,7 @@ function Set-ElementValue( $id, $val)
 			foreach( $op in @($el.childNodes))
 			{
 				#trace "item '$($op.innerText)'"
-				if( $op.innerText -eq $val)
+				if( $op.innerText -eq $text)
 				{
 					$idx = $op.index
 					break
@@ -818,7 +867,7 @@ function Set-ElementValue( $id, $val)
 		}
 		else
 		{
-			$el.value = $val
+			$el.value = $text
 		}
 	}
 	else
@@ -831,6 +880,16 @@ function Set-ElementValue( $id, $val)
 }
 
 ###########################################################
+<#  
+.SYNOPSIS  
+
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#>  
 Set-Alias assert Test-Assertion
 Set-Alias test Test-Assertion
 function Test-Assertion
@@ -886,296 +945,18 @@ function Test-Assertion
 	Write-TestResult $result 
 }
 
-###########################################################
-Set-Alias Comment Write-Comment
-function Write-Comment( $str, $type="plain")
-{
-	Write-TAPComment $str $type
-	Add-HtmlLogEntry -t 'comment' -v $str -l $type
-}
+<###########################################################
+ All of the above functions are exported.  Everything below
+ This statement in not available to scripts.
+#>
+Export-ModuleMember -Alias * -Function *
 
 ###########################################################
-Set-Alias tapComment Write-TAPComment
-function Write-TAPComment( $str, $type="")
-{
-	$color = "White"
-	
-	if( $type -eq 'error')
-	{
-		$color = 'Red'
-		write-host "# ERROR: " -NoNewline   -foregroundcolor $color
-	}
-	elseif( $type -eq 'trace')
-	{
-		$color = 'Yellow'
-		write-host "# TRACE: " -NoNewline   -foregroundcolor $color
-	}
-	else
-	{
-		$color = "White"
-		write-host "# " -NoNewline   -foregroundcolor $color
-	}
-	
-	write-host $str  -foregroundcolor $color
-}
-
-###########################################################
-Set-Alias trace Trace-Message
-function Trace-Message
-{
-	param( 
-		[alias("t")][string]$text=$null, 
-		[switch]$on, 
-		[switch]$off
-	)
-	
-	if( $on)
-	{
-		$script:trace = $true
-	}
-	
-	if( $script:trace -and $text)
-	{
-		tapComment "$($testScript):$testLine $text" -type "trace"
-	}
-	
-	if( $off)
-	{
-		$script:trace = $false
-	}
-}
-
-###########################################################
-$testCount = 0
-$passCount = 0
-
-###########################################################
-Set-Alias testResult Write-TestResult
-function Write-TestResult( $pass, $description)
-{
-	$script:testCount += 1
-	
-	if( !$description)
-	{
-		$description = $cmdLine
-	}
-	
-	if( $pass)
-	{
-		$script:passCount += 1;
-	}
-	
-	Write-TAPTestResult $pass $description
-	Write-HtmlTestResult $pass $description
-}	
-
-###########################################################
-Set-Alias tapTestResult Write-TAPTestResult
-function Write-TAPTestResult( $pass, $description)
-{
-	if( $pass)
-	{
-		write-host "ok $testCount -" "$testScript`:$testLine $testName $description"  -foregroundcolor green
-	}
-	else
-	{
-		write-host "not ok $testCount -" "$testScript`:$testLine $description"  -foregroundcolor red
-	}
-}	
-
-###########################################################
-Set-Alias htmlTestResult Write-HtmlTestResult
-function Write-HtmlTestResult( $pass, $description)
-{
-	if( $autoSnap)
-	{
-		Write-Screenshot -noLog
-	}
-	
-	if( $pass)
-	{
-		Add-HtmlLogEntry -t 'testEntry' -l "ok" -v $description
-	}
-	else
-	{
-		Add-HtmlLogEntry -t 'testEntry' -l "not ok" -v $description
-	}	
-}	
-
-###########################################################
-function Add-HtmlLogEntry
-{
-	param( 
-		[alias("t")][string]$type=$null,
-		[alias("l")][string]$label=$null,
-		[alias("v")][string]$value=$null
-	)
-	
-	if( !$sectionOutput)
-	{
-		$script:sectionOutput = @()
-	}
-	
-	$html = $script:sectionOutput
-	
-	if( $type -eq 'bannerStart')
-	{
-		$html += "<table class='bannerTable'>"
-	}
-	elseif( $type -eq 'bannerEnd')
-	{
-		$html += "</table>"
-	}
-	elseif( $type -eq 'bannerEntry')
-	{
-		$html += "<tr class='bannerEntry'><th class='bannerLabel'>$label</th><td class='bannerValue'>$value</td></tr>"
-	}
-	elseif( $type -eq 'sectionStart')
-	{
-		$html += "<h2 class='sectionTitle'>$label</h2>"
-		$html += "<table class='sectionTable'>"
-	}
-	elseif( $type -eq 'comment')
-	{
-		$html += "<tr>"
-		$html +=   "<td></td>"
-		$html +=   "<td></td>"
-		$html +=   "<td>$testScript</td>"
-		$html +=   "<td>$testLine</td>"
-		$html +=   "<td class='comment-$label'>$value</td>"
-		$html +=   "<td></td>"
-		$html += "</tr>"
-	}
-	elseif( $type -eq 'testEntry')
-	{
-		$html += "<tr class='testEntry'>"
-		if( $label -eq 'ok')
-		{
-			$html += "<td class='pass'>ok</td>"
-		}
-		else
-		{
-			$html += "<td class='fail'>not ok</td>"
-		}
-		$html += "<td class='testNumber'>$testCount</td>"
-		$html += "<td>$testScript</td>"
-		$html += "<td>$testLine</td>"
-		$html += "<td>$value</td>"
-		if( $autoSnap)
-		{
-			$html += "<td class='thumb'>"
-			$html += "  <a href='./screenshots/$ssFileName'><img src='./screenshots/$ssFileName' title='$ssFileName'/></a>"
-			$html += "</td>"
-		}
-		else
-		{
-			$html += "<td></td>"
-		}
-		$html += "</tr>"
-	}
-	elseif( $type -eq 'sectionEnd')
-	{
-		$html += "</table>"
-	}
-	elseif( $type -eq 'screenshot')
-	{
-		$html += "<tr class='testEntry'>"
-		$html +=   "<td></td>"
-		$html +=   "<td class='testNumber'>$testCount</td>"
-		$html +=   "<td>$testScript</td>"
-		$html +=   "<td>$testLine</td>"
-		$html +=   "<td>$value</td>"
-		$html +=   "<td class='thumb'>"
-		$html +=     "<a href='./screenshots/$ssFileName'><img src='./screenshots/$ssFileName' title='$ssFileName'/></a>"
-		$html +=   "</td>"
-		$html += "</tr>"
-	}
-	elseif( $type -eq 'start')
-	{
-		$html += '<!doctype html>'
-		$html += '<html><head><title>Test Summary</title></head>'
-		$html += '<body>'
-		$html += '<style>'
-		$html += 'table{border-style:none;border-width:0px;font-size:8pt;background-color:#ccc;width:100%;}'
-		$html += 'th{text-align:right;}'
-		#$output += 'td{background-color:#fff;border-style:dotted;border-width:1px;}'
-		$html += 'td.thumb{height:200px; float:right;}'
-		$html += 'tr.testEntry td.pass, td.fail{width:50px}'
-		$html += 'td.pass{background-color:#00FF00;}'
-		$html += 'td.fail{background-color:#FF0000;}'
-		$html += 'td.comment-error{background-color:#FF0000;}'
-		$html += 'td.comment-trace{background-color:#FFFF00;}'
-		$html += 'body{font-family:verdana;font-size:8pt;}'
-		$html += 'h1{font-size:14pt;}'
-		$html += 'h2{font-size:12pt;}'
-		$html += 'img{height: 100%; vericle-align: middle}'
-		$html += '</style>'
-		$html += '<h1>Test Log</h1>'
-	}
-	elseif( $type -eq 'end')
-	{
-		$html += "<h1 class='$type'>$passCount of $testCount tests passed.</h1>"
-		$html += '</body></html>'
-	}
-	
-	$script:sectionOutput = $html
-}
-
-###########################################################
-function Write-HtmlLog
-{
-	$count = @($sectionOutput).length
-	$script:sectionOutput | Out-File $logFileName -Append -Force
-	$script:sectionOutput = $null
-}
-
-###########################################################
-function Show-HtmlLog
-{
-	if( $showHtmlLog)
-	{
-		$ie.navigate2($logFileName, 2048, "Test Summary")
-	}
-}
-
-###########################################################
-Set-Alias screenshot Write-Screenshot
-function Write-Screenshot( $description, [switch]$noLog)
-{
-	if( !$noLog)
-	{
-		# only do this if called from a user's script
-		$script:testScript = $MyInvocation.ScriptName.split("\")[-1].split(".")[0]
-		$script:testLine = $MyInvocation.ScriptLineNumber
-		$script:cmdLine = $MyInvocation.Line
-	}
-	$script:ssFileName = "$testScript-$testLine.png"
-	$count = 1;
-	
-	if( !(test-path "$logDir\screenshots" -pathType container))
-	{
-		New-Item "$logDir\screenshots" -type directory
-	}
-	
-	while( test-path "$logDir\screenshots\$ssFileName") 
-	{
-		$count++
-		$script:ssFileName = "$testScript-$($testLine)_$count.png"
-	}
-	
-	Get-ScreenShot -ie $ie -file "$logDir\screenshots\$ssFileName" 
-	
-	if( !$noLog)
-	{
-		Add-HtmlLogEntry -t "screenshot" -v $description
-	}
-}
+. $psScriptRoot\support.ps1
+. $psScriptRoot\output.ps1
 
 ###########################################################
 . $psScriptRoot\Get-Screenshot.ps1
 
 ###########################################################
 . $psScriptRoot\Get-IETab.ps1
-
-###########################################################
-Export-ModuleMember -Alias * -Function *

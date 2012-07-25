@@ -1,34 +1,33 @@
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 <#  
 .SYNOPSIS  
-    Used to take a screenshot of the desktop or the active window. 
-.DESCRIPTION  
-    Used to take a screenshot of the desktop or the active window and save to an image file if needed.
+    Used to take a screenshot of an IE tab window and save as a png/bmp/jpeg file. 
 .PARAMETER screen
     Screenshot of the entire screen
-.PARAMETER activewindow
-    Screenshot of the active window
+.PARAMETER ie
+    Internet Explorer object
 .PARAMETER file
     Name of the file to save as. Default is image.bmp
 .PARAMETER imagetype
     Type of image being saved. Can use JPEG,BMP,PNG. Default is bitmap(bmp)    
-.INPUTS
-.OUTPUTS    
-.NOTES  
-    Name: Get-ScreenShot
-    Author: Boe Prox
-    DateCreated: 07/25/2010     
-.EXAMPLE  
-    Get-ScreenShot -activewindow
-    Takes a screen shot of the active window        
-.EXAMPLE  
-    Get-ScreenShot -Screen
-    Takes a screenshot of the entire desktop
-.EXAMPLE  
-    Get-ScreenShot -activewindow -file "C:\image.bmp" -imagetype bmp
-    Takes a screenshot of the active window and saves the file named image.bmp with the image being bitmap
-.EXAMPLE  
-    Get-ScreenShot -screen -file "C:\image.png" -imagetype png    
-    Takes a screenshot of the entire desktop and saves the file named image.png with the image being png
 #>  
 #Requires -Version 2
 Function Get-ScreenShot 
@@ -50,10 +49,6 @@ namespace IETabScreenshot
 {
   public class ScreenCapture
   {
-	public IntPtr FindWindow(string windowClass, string windowTitle){
-			return Win32.FindWindow( windowClass, windowTitle);
-	}
-	
 	public IntPtr FindFirstChildWindow( IntPtr parent, string windowClass, string windowTitle){
 		return Win32.FindWindowEx( parent, IntPtr.Zero, windowClass, windowTitle);
 	}
@@ -91,53 +86,8 @@ namespace IETabScreenshot
 		
 		// free up the Bitmap object
 		Win32.DeleteObject(hBitmap);
-/*
-	  try
-	  {
-		// get the hDC of the target window
-		IntPtr hdcSrc = User32.GetWindowDC(handle);
 
-		if( hdcSrc == IntPtr.Zero)
-		{
-			return -1;
-		}
-
-		// get the size
-		User32.RECT windowRect = new User32.RECT();
-		if( User32.GetWindowRect(handle,ref windowRect) == IntPtr.Zero)
-		{	
-			return -2;
-		}
-
-		int width = windowRect.right - windowRect.left;
-		int height = windowRect.bottom - windowRect.top;
-
-		Bitmap bmp = new Bitmap( width, height);
-		Graphics g = Graphics.FromImage( bmp);
-		IntPtr dc = g.GetHdc();
-
-		if( User32.PrintWindow( handle, dc, 0) == IntPtr.Zero)
-		{
-			return -3;
-		}
-		//Thread.Sleep( 1000);
-
-		g.ReleaseHdc(dc);
-		g.Flush();
-		g.Dispose();
-
-		// free up the Bitmap object
-		User32.ReleaseDC(handle,hdcSrc);
-
-		bmp.Save(filename,format);
-		bmp.Dispose();
-	  }
-	  catch
-	  {
-		return -4;
-	  }
-*/	  
-	  return 0;
+	    return 0;
     }
 	
     /// <summary>
@@ -161,8 +111,6 @@ namespace IETabScreenshot
 	public static extern IntPtr GetWindowRect(IntPtr hWnd,ref RECT rect);
 	[DllImport("user32.dll")]
 	public static extern IntPtr PrintWindow(IntPtr hWnd, IntPtr dc, uint flags);     
-	[DllImport("user32.dll")]  
-	public static extern IntPtr FindWindow(string lpClassName, string lpWindowName); 
 	[DllImport("user32.dll", SetLastError=true, CharSet=CharSet.Auto)]
 	public static extern IntPtr FindWindowEx(IntPtr parentHandle, IntPtr childAfter, string lclassName, string windowTitle);
 	[DllImport("gdi32.dll")]
