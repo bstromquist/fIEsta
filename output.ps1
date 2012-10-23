@@ -230,7 +230,8 @@ function Add-HtmlLogEntry
 		if( $autoSnap)
 		{
 			$html += "<td class='thumb'>"
-			$html += "  <a href='./screenshots/$ssFileName'><img src='./screenshots/$ssFileName' title='$ssFileName'/></a>"
+#			$html += "  <a href='./screenshots/$ssFileName'><img src='./screenshots/$ssFileName' title='$ssFileName'/></a>"
+			$html += "  <a href='$ssFileName'><img src='file:///$logDir/$ssFileName' title='$ssFileName'/></a>"
 			$html += "</td>"
 		}
 		else
@@ -252,7 +253,8 @@ function Add-HtmlLogEntry
 		$html +=   "<td>$testLine</td>"
 		$html +=   "<td>$value</td>"
 		$html +=   "<td class='thumb'>"
-		$html +=     "<a href='./screenshots/$ssFileName'><img src='./screenshots/$ssFileName' title='$ssFileName'/></a>"
+#		$html +=     "<a href='./screenshots/$ssFileName'><img src='./screenshots/$ssFileName' title='$ssFileName'/></a>"
+		$html +=     "<a href='$ssFileName'><img src='file:///$logDir/$ssFileName' title='$ssFileName'/></a>"
 		$html +=   "</td>"
 		$html += "</tr>"
 	}
@@ -291,8 +293,10 @@ function Add-HtmlLogEntry
 function Write-HtmlLog
 {
 	$count = @($sectionOutput).length
-	$script:sectionOutput | Out-File $logFileName -Append -Force
+	$script:sectionOutput | Out-File "$logFileName.html" -Append -Force
 	$script:sectionOutput = $null
+	
+	create-MHT "$logFileName.html" "$logFileName.mht"
 }
 
 ###########################################################
@@ -300,7 +304,7 @@ function Show-HtmlLog
 {
 	if( $showHtmlLog)
 	{
-		$ie.navigate2($logFileName, 2048, "Test Summary")
+		$ie.navigate2("$logFileName.html", 2048, "Test Summary")
 	}
 }
 
@@ -340,11 +344,35 @@ function Write-Screenshot( $description, [switch]$noLog)
 	}
 	
 	WaitForIE
-	Get-ScreenShot -ie $ie -file "$logDir\screenshots\$ssFileName" 
+#	Get-ScreenShot -ie $ie -file "$logDir\screenshots\$ssFileName" 
+	Get-ScreenShot -ie $ie -file "$logDir\$ssFileName" 
 	
 	if( !$noLog)
 	{
 		Add-HtmlLogEntry -t "screenshot" -v $description
 	}
 }
+
+
+function Create-MHT($htmlPath,$mhtPath)
+{
+	$adSaveCreateNotExist = 1
+	$adSaveCreateOverWrite = 2
+	$adTypeBinary = 1
+	$adTypeText = 2
+	
+	$msg = New-Object -ComObject CDO.Message
+	$msg.CreateMHTMLBody( $htmlPath, 0)
+	
+	$strm = New-Object -ComObject ADODB.Stream
+	# $strm.Type = $adTypeBinary
+	$strm.Type = $adTypeText
+	$strm.Charset = "US-ASCII"
+	$strm.Open()
+	$dsk = $msg.DataSource
+	$dsk.SaveToObject( $strm, "_Stream")
+
+	$strm.SaveToFile($mhtPath, $adSaveCreateOverWrite)
+}
+
 

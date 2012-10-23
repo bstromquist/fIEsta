@@ -47,7 +47,7 @@ $sectionOutput = $null
 ###########################################################
 <#  
 .SYNOPSIS  
-
+	Get everthing ready to start testing. 
 .DESCRIPTION
     
 .PARAMETER x
@@ -76,11 +76,11 @@ function Initialize-Script
 		New-Item $logDir -type directory
 	}
 	
-	$script:logFileName = "$logDir\$($testScript)_log.html"
-	while( test-path $logFileName) 
+	$script:logFileName = "$logDir\$($testScript)_log"
+	while( test-path "$logFileName.html") 
 	{
 		$count++
-		$script:logFileName = "$logDir\$($testScript)_log_$count.html"
+		$script:logFileName = "$logDir\$($testScript)_log_$count"
 	}
 	
 	Add-HtmlLogEntry -t 'start' 
@@ -648,6 +648,7 @@ function Send-Click
 		   )
 		   
 	$result = $true
+	$el = $null
 	$script:testScript = $MyInvocation.ScriptName.split("\")[-1].split(".")[0]
 	$script:testLine = $MyInvocation.ScriptLineNumber
 	$script:cmdLine = $MyInvocation.Line

@@ -221,18 +221,29 @@ function Find-Element
 		{
 			trace "findElement by '$text' alone."
 			# search by innerText, id, name
-			#$tags = @( "input", "button", "a", "select", "option", "div", "td", "li", "span")
-			$tags = @( "*")
 			
-			foreach( $tag in $tags)
+			# is it an id attribute
+			$el = $ie.document.getElementByID( $text)
+			
+			# is it a name attribute
+			if( !$el)
 			{
-				$items = $root.getElementsByTagName( $tag)
+				$el = @($ie.document.getElementsByName( $text))[0]
+			}
+
+			# is it innerText
+			if( !$el)
+			{
+				# search in reverse to get the inner-most item that matches the text
+				$items = $root.getElementsByTagName( "*")
+				$count = @($items).length
 				
-				foreach( $i in $items)
+				for( $index = $count-1; $index -ne 0; $index--)
 				{ 
+					$i = @($items)[$index]
 					$textVal = ''
 					
-					if( $tag -eq "input")
+					if( $i.tagName -eq "input")
 					{
 						$textVal = $i.value
 					}
@@ -248,23 +259,6 @@ function Find-Element
 						break
 					}
 				}
-				
-				if( $el)
-				{
-					break;
-				}
-			}
-			
-			# is it an id attribute
-			if( !$el)
-			{
-				$el = $ie.document.getElementByID( $text)
-			}
-			
-			# is it a name attribute
-			if( !$el)
-			{
-				$el = @($ie.document.getElementsByName( $text))[0]
 			}
 		}
 		else
