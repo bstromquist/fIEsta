@@ -230,8 +230,8 @@ function Add-HtmlLogEntry
 		if( $autoSnap)
 		{
 			$html += "<td class='thumb'>"
-#			$html += "  <a href='./screenshots/$ssFileName'><img src='./screenshots/$ssFileName' title='$ssFileName'/></a>"
-			$html += "  <a href='$ssFileName'><img src='file:///$logDir/$ssFileName' title='$ssFileName'/></a>"
+			$html += "  <a href='screenshots/$ssFileName'><img src='screenshots/$ssFileName' title='$ssFileName'/></a>"
+#			$html += "  <a href='$ssFileName'><img src='file:///$logDir/$ssFileName' title='$ssFileName'/></a>"
 			$html += "</td>"
 		}
 		else
@@ -253,8 +253,8 @@ function Add-HtmlLogEntry
 		$html +=   "<td>$testLine</td>"
 		$html +=   "<td>$value</td>"
 		$html +=   "<td class='thumb'>"
-#		$html +=     "<a href='./screenshots/$ssFileName'><img src='./screenshots/$ssFileName' title='$ssFileName'/></a>"
-		$html +=     "<a href='$ssFileName'><img src='file:///$logDir/$ssFileName' title='$ssFileName'/></a>"
+		$html +=     "<a href='screenshots/$ssFileName'><img src='screenshots/$ssFileName' title='$ssFileName'/></a>"
+#		$html +=     "<a href='$ssFileName'><img src='file:///$logDir/$ssFileName' title='$ssFileName'/></a>"
 		$html +=   "</td>"
 		$html += "</tr>"
 	}
@@ -344,8 +344,8 @@ function Write-Screenshot( $description, [switch]$noLog)
 	}
 	
 	WaitForIE
-#	Get-ScreenShot -ie $ie -file "$logDir\screenshots\$ssFileName" 
-	Get-ScreenShot -ie $ie -file "$logDir\$ssFileName" 
+	Get-ScreenShot -ie $ie -file "$logDir\screenshots\$ssFileName" 
+#	Get-ScreenShot -ie $ie -file "$logDir\$ssFileName" 
 	
 	if( !$noLog)
 	{
