@@ -37,7 +37,9 @@ Add-Type -AssemblyName System.Windows.Forms
 $shell = New-Object -comObject Shell.Application
 
 $trace = $false
-$logDir = "$pwd\log"
+$logDirBase = "$pwd\log"
+$logSubdir = Get-Date -format yyyyMMdd
+$logDir = "{0}\{1}" -f $logDirBase, $logSubdir
 $logFileName = ""
 $showHtmlLog = $true
 $autoSnap = $true
@@ -71,11 +73,15 @@ function Initialize-Script
 	$script:showIE = !$hidden
 
 	$count = 1;
+	if( !(test-path $logDirBase -pathType container))
+	{
+		New-Item $logDirBase -type directory
+	}
 	if( !(test-path $logDir -pathType container))
 	{
 		New-Item $logDir -type directory
 	}
-	
+
 	$script:logFileName = "$logDir\$($testScript)_log"
 	while( test-path "$logFileName.html") 
 	{
