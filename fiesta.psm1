@@ -37,9 +37,16 @@ Add-Type -AssemblyName System.Windows.Forms
 $shell = New-Object -comObject Shell.Application
 
 $trace = $false
-$logDirBase = "$pwd\log"
-$logSubdir = Get-Date -format yyyyMMdd
-$logDir = "{0}\{1}" -f $logDirBase, $logSubdir
+
+# by default, results are stored in a $pwd\log\yyyyMMdd_hhmmss directory
+#$defaultLogDirBase = "$pwd\log"
+#$defaultLogSubdir = Get-Date -format yyyyMMdd_hhmmss
+$defaultCfg = @{
+	"resultsDir"="$pwd\log";
+	"resultsSubdir"= Get-Date -format yyyyMMdd_hhmmss
+	"closeAll"=$false;
+}
+
 $logFileName = ""
 $showHtmlLog = $true
 $autoSnap = $true
@@ -62,10 +69,25 @@ function Initialize-Script
 {
 	param(
 		[string]$url,
-		[bool]$closeAll=$false,
-		[bool]$trace=$false
+		[hashtable]$config=$defaultCfg # a hash of parameters, incl. e.g. $cfg['trace'], $cfg['resultsDir'], etc.
 	)
 	
+	# take some defaults if none given to the passed hash
+	if ($config['resultsDir']) {
+		$resultsDir = $config['resultsDir'];
+	}
+	else {
+		$resultsDir = $defaultCfg['resultsDir'];
+	}
+	if ($config['resultsSubdir']) {
+		$resultsSubdir = $config['resultsSubdir'];
+	}
+	else {
+		$resultsSubdir = $defaultCfg['resultsSubdir'];
+	}
+
+	$script:logDir = "{0}\{1}" -f $resultsDir, $resultsSubdir;
+
 	$script:testScript = $MyInvocation.ScriptName.split("\")[-1].split(".")[0]
 	$script:testLine = $MyInvocation.ScriptLineNumber
 	$script:cmdLine = $MyInvocation.Line
@@ -73,20 +95,20 @@ function Initialize-Script
 	$script:showIE = !$hidden
 
 	$count = 1;
-	if( !(test-path $logDirBase -pathType container))
+
+	# if it doesn't exist, this will (recursively) create $logDir/screenshots 
+	# this creates all dirs needed for the test in one fell swoop
+	if( !(test-path ${script:logDir}\screenshots -pathType container))
 	{
-		New-Item $logDirBase -type directory
-	}
-	if( !(test-path $logDir -pathType container))
-	{
-		New-Item $logDir -type directory
+		New-Item ${script:logDir}\screenshots -type directory
 	}
 
-	$script:logFileName = "$logDir\$($testScript)_log"
+	#$script:logFileName = "${script:logDir}\$($testScript)_log"
+	$script:logFileName = "$logDir\$($testScript)_log";
 	while( test-path "$logFileName.html") 
 	{
 		$count++
-		$script:logFileName = "$logDir\$($testScript)_log_$count"
+		$script:logFileName = "${script:logDir}\$($testScript)_log_$count"
 	}
 	
 	Add-HtmlLogEntry -t 'start' 
@@ -98,6 +120,49 @@ function Initialize-Script
 	
 	if( $closeAll)
 	{
+		Close-IE
+	}
+
+	# Create an ie com object
+	trace "Launching IE..."
+	$ie = New-Object -com internetexplorer.application
+	$ie.top = 0
+	$ie.left = 0
+	$ie.visible = $true 
+	$script:ie = $ie
+	$script:mainHandle = $ie.hwnd
+
+	# Wait for IE to fully launch
+	Start-Sleep -milliseconds 500
+	$script:proc = Get-Process | where {$_.mainwindowtitle -eq "Windows Internet Explorer"}		
+	
+	if( $script:proc)
+	{
+		#$script:proc | gm
+		# For some unknown reason IE dosen't always get focus so force it.
+		[void]$script:proc.waitForInputIdle()
+		Start-Sleep -milliseconds 500
+		
+		#TODO put this in front of every sendkeys call
+		[Microsoft.VisualBasic.Interaction]::AppActivate( $script:proc.mainwindowtitle)
+	}
+
+}
+
+###########################################################
+<#  
+.SYNOPSIS  
+	Close any open IE windows
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#> 
+Set-Alias initialize Initialize-Script
+function Close-IE 
+{
 		# close all IE instances
 		trace "Closing all open IE instances..."
 		foreach( $win in @($shell.windows()))
@@ -133,34 +198,8 @@ function Initialize-Script
 			Start-Sleep -milliseconds 500
 		} 
 		while (!$allClosed)
-	}
-	
-	# Create an ie com object
-	trace "Launching IE..."
-	$ie = New-Object -com internetexplorer.application
-	$ie.top = 0
-	$ie.left = 0
-	$ie.visible = $true 
-	$script:ie = $ie
-	$script:mainHandle = $ie.hwnd
-
-	# Wait for IE to fully launch
-	Start-Sleep -milliseconds 500
-	$script:proc = Get-Process | where {$_.mainwindowtitle -eq "Windows Internet Explorer"}		
-	
-	if( $script:proc)
-	{
-		#$script:proc | gm
-		# For some unknown reason IE dosen't always get focus so force it.
-		[void]$script:proc.waitForInputIdle()
-		Start-Sleep -milliseconds 500
-		
-		#TODO put this in front of every sendkeys call
-		[Microsoft.VisualBasic.Interaction]::AppActivate( $script:proc.mainwindowtitle)
-	}
-
 }
-
+	
 ###########################################################
 <#  
 .SYNOPSIS  
@@ -272,6 +311,9 @@ function Select-BrowserTab( $title)
 Set-Alias finalize Show-Summary
 function Show-Summary
 {
+	param(
+		[hashtable]$config=$defaultCfg # a hash of parameters, incl. e.g. $cfg['closeAll'], etc.
+	)
 	Add-HtmlLogEntry -t 'sectionEnd'
 
 	tapComment "$passCount of $testCount tests passed." -type "result"
@@ -279,6 +321,10 @@ function Show-Summary
 	Add-HtmlLogEntry -t 'end' 
 	Write-HtmlLog
 	Show-HtmlLog
+
+	if ($config['closeAll']) {
+		Close-IE
+	}
 }
 
 ###########################################################
