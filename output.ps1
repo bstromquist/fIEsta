@@ -231,7 +231,6 @@ function Add-HtmlLogEntry
 		{
 			$html += "<td class='thumb'>"
 			$html += "  <a href='screenshots/$ssFileName'><img src='screenshots/$ssFileName' title='$ssFileName'/></a>"
-#			$html += "  <a href='$ssFileName'><img src='file:///$logDir/$ssFileName' title='$ssFileName'/></a>"
 			$html += "</td>"
 		}
 		else
@@ -254,7 +253,6 @@ function Add-HtmlLogEntry
 		$html +=   "<td>$value</td>"
 		$html +=   "<td class='thumb'>"
 		$html +=     "<a href='screenshots/$ssFileName'><img src='screenshots/$ssFileName' title='$ssFileName'/></a>"
-#		$html +=     "<a href='$ssFileName'><img src='file:///$logDir/$ssFileName' title='$ssFileName'/></a>"
 		$html +=   "</td>"
 		$html += "</tr>"
 	}
@@ -290,16 +288,6 @@ function Add-HtmlLogEntry
 }
 
 ###########################################################
-function Write-HtmlLog
-{
-	$count = @($sectionOutput).length
-	$script:sectionOutput | Out-File "$logFileName.html" -Append -Force
-	$script:sectionOutput = $null
-	
-	create-MHT "$logFileName.html" "$logFileName.mht"
-}
-
-###########################################################
 function Show-HtmlLog
 {
 	if( $showHtmlLog)
@@ -332,11 +320,6 @@ function Write-Screenshot( $description, [switch]$noLog)
 	$script:ssFileName = "$testScript-$testLine.png"
 	$count = 1;
 	
-	if( !(test-path "$logDir\screenshots" -pathType container))
-	{
-		New-Item "$logDir\screenshots" -type directory
-	}
-	
 	while( test-path "$logDir\screenshots\$ssFileName") 
 	{
 		$count++
@@ -345,7 +328,6 @@ function Write-Screenshot( $description, [switch]$noLog)
 	
 	WaitForIE
 	Get-ScreenShot -ie $ie -file "$logDir\screenshots\$ssFileName" 
-#	Get-ScreenShot -ie $ie -file "$logDir\$ssFileName" 
 	
 	if( !$noLog)
 	{
@@ -353,26 +335,12 @@ function Write-Screenshot( $description, [switch]$noLog)
 	}
 }
 
-
-function Create-MHT($htmlPath,$mhtPath)
+function Write-HtmlLog
 {
-	$adSaveCreateNotExist = 1
-	$adSaveCreateOverWrite = 2
-	$adTypeBinary = 1
-	$adTypeText = 2
-	
-	$msg = New-Object -ComObject CDO.Message
-	$msg.CreateMHTMLBody( $htmlPath, 0)
-	
-	$strm = New-Object -ComObject ADODB.Stream
-	# $strm.Type = $adTypeBinary
-	$strm.Type = $adTypeText
-	$strm.Charset = "US-ASCII"
-	$strm.Open()
-	$dsk = $msg.DataSource
-	$dsk.SaveToObject( $strm, "_Stream")
+	$count = @($sectionOutput).length
+	$script:sectionOutput | Out-File "$logFileName.html" -Append -Force
+	$script:sectionOutput = $null
 
-	$strm.SaveToFile($mhtPath, $adSaveCreateOverWrite)
 }
 
 
