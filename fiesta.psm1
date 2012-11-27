@@ -958,7 +958,8 @@ function Test-Assertion
 		   [alias("rav")][string]$rootAttrValue=$null,
 		                 [switch]$title,
 		   [alias("nf")] [switch]$notFound,
-		   [alias("v")]  [switch]$visible
+		   [alias("v")]  [switch]$visible,
+		   [alias("nv")]  [switch]$notVisible
 		   )
 		   
 	$script:testScript = $MyInvocation.ScriptName.split("\")[-1].split(".")[0]
@@ -989,7 +990,14 @@ function Test-Assertion
 		trace "testing visiblity of $($e.tag) element id = '$($el.id)' text = '$($el.innerText)'"
 		$result = ($el.offsetWidth -gt 0) -or ($el.offsetHeight -gt 0)
 	}
-		
+
+	if( $notVisible -and $result)
+	{
+		$el = $result
+		trace "testing invisiblity of $($e.tag) element id = '$($el.id)' text = '$($el.innerText)'"
+		$result = ! $el -or ( ($el.offsetWidth -eq 0) -and ($el.offsetHeight -eq 0) )
+	}
+			
 	if( $notFound)
 	{
 		$result = !$result
