@@ -227,11 +227,21 @@ function Add-HtmlLogEntry
 		$html += "<td>$testScript</td>"
 		$html += "<td>$testLine</td>"
 		$html += "<td>$value</td>"
-		if( $autoSnap)
+		if( $autoSnap )
 		{
-			$html += "<td class='thumb'>"
-			$html += "  <a href='screenshots/$ssFileName'><img src='screenshots/$ssFileName' title='$ssFileName'/></a>"
-			$html += "</td>"
+			if ($label -eq 'ok')
+			{
+				$html += "<td class='pass'>"
+				$html += "  <a href='screenshots/$ssFileName'>Screenshot</a>"
+				$html += "</td>"
+				
+			}
+			else
+			{
+				$html += "<td class='thumb'>"
+				$html += "  <a href='screenshots/$ssFileName'><img src='screenshots/$ssFileName' title='$ssFileName'/></a>"
+				$html += "</td>"
+			}
 		}
 		else
 		{
