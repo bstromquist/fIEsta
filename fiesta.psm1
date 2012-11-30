@@ -42,9 +42,11 @@ $trace = $false
 #$defaultLogDirBase = "$pwd\log"
 #$defaultLogSubdir = Get-Date -format yyyyMMdd_hhmmss
 $defaultCfg = @{
+	"url"="http://google.com";
 	"resultsDir"="$pwd\log";
 	"resultsSubdir"= Get-Date -format yyyyMMdd_hhmmss
 	"closeAll"=$false;
+	"trace"=$false;
 }
 
 $logFileName = ""
@@ -65,13 +67,8 @@ $sectionOutput = $null
     ...  
 #>  
 Set-Alias initialize Initialize-Script
-function Initialize-Script
+function Initialize-Script ( $config=$defaultCfg )
 {
-	param(
-		[string]$url,
-		[hashtable]$config=$defaultCfg # a hash of parameters, incl. e.g. $cfg['trace'], $cfg['resultsDir'], etc.
-	)
-	
 	# take some defaults if none given to the passed hash
 	if ($config['resultsDir']) {
 		$resultsDir = $config['resultsDir'];
@@ -91,7 +88,7 @@ function Initialize-Script
 	$script:testScript = $MyInvocation.ScriptName.split("\")[-1].split(".")[0]
 	$script:testLine = $MyInvocation.ScriptLineNumber
 	$script:cmdLine = $MyInvocation.Line
-	$script:trace = $trace
+	$script:trace = $config['trace']
 	$script:showIE = !$hidden
 
 	$count = 1;
@@ -103,22 +100,21 @@ function Initialize-Script
 		New-Item ${script:logDir}\screenshots -type directory
 	}
 
-	#$script:logFileName = "${script:logDir}\$($testScript)_log"
-	$script:logFileName = "$logDir\$($testScript)_log";
+	$script:logFileName = "$logDir\$($testScript)";
 	while( test-path "$logFileName.html") 
 	{
 		$count++
-		$script:logFileName = "${script:logDir}\$($testScript)_log_$count"
+		$script:logFileName = "${script:logDir}\$($testScript)_$count"
 	}
 	
 	Add-HtmlLogEntry -t 'start' 
-	Write-HtmlLog
+	Write-HtmlLog $config
 	
-	Write-Banner $url
+	Write-Banner $config
 	
 	section "Initialize"
 	
-	if( $closeAll)
+	if( $config['closeAll'])
 	{
 		Close-IE
 	}
@@ -138,7 +134,6 @@ function Initialize-Script
 	
 	if( $script:proc)
 	{
-		#$script:proc | gm
 		# For some unknown reason IE dosen't always get focus so force it.
 		[void]$script:proc.waitForInputIdle()
 		Start-Sleep -milliseconds 500
@@ -160,7 +155,7 @@ function Initialize-Script
 .EXAMPLE 
     ...  
 #> 
-Set-Alias initialize Initialize-Script
+Set-Alias close Initialize-Script
 function Close-IE 
 {
 		# close all IE instances
@@ -309,21 +304,20 @@ function Select-BrowserTab( $title)
     ...  
 #>  
 Set-Alias finalize Show-Summary
-function Show-Summary
+function Show-Summary( $config=$defaultCfg )
 {
-	param(
-		[hashtable]$config=$defaultCfg # a hash of parameters, incl. e.g. $cfg['closeAll'], etc.
-	)
 	Add-HtmlLogEntry -t 'sectionEnd'
 
 	tapComment "$passCount of $testCount tests passed." -type "result"
 	
 	Add-HtmlLogEntry -t 'end' 
 	Write-HtmlLog
-	Show-HtmlLog
 
 	if ($config['closeAll']) {
 		Close-IE
+	}
+	else {
+		Show-HtmlLog
 	}
 }
 
@@ -362,7 +356,6 @@ function Set-BrowserLocation
 	{
 		$keys = "$user"
 		wait 
-		#Send-Keys("$user{TAB}$pass{ENTER}") # only works when sent as a single string
 		Start-Sleep -milliseconds 500
 		
 		if( $pass)
@@ -376,7 +369,6 @@ function Set-BrowserLocation
 	}
 	
 	waitForIE
-	#[System.Windows.Forms.SendKeys]::SendWait("1")
 }
 
 ###########################################################
@@ -733,7 +725,6 @@ function Send-Click
 			$idx = -1
 			foreach( $op in @($el.childNodes))
 			{
-				#trace "item '$($op.innerText)'"
 				if( $op.innerText -eq $text)
 				{
 					$idx = $op.index
@@ -770,14 +761,12 @@ function Send-Click
 				trace "fireEvent threw an error"
 			}
 			
-			#$el.focus()
 			
 			if( !$double)
 			{
 				try 
 				{
 					$el.click()
-					#[void]$el.fireEvent( "click")
 				}
 				catch 
 				{
@@ -898,7 +887,6 @@ function Set-ElementValue #( $id, $val)
 			$idx = -1
 			foreach( $op in @($el.childNodes))
 			{
-				#trace "item '$($op.innerText)'"
 				if( $op.innerText -eq $text)
 				{
 					$idx = $op.index
