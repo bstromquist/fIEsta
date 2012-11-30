@@ -27,22 +27,28 @@
 .EXAMPLE 
     ...  
 #>  
-function Write-Banner( $url)
+function Write-Banner( $config )
 {
 	$strComputer = gc env:computername;
 
 	$ieversion = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Internet Explorer').Version
-#	$colItems = get-wmiobject -class "MicrosoftIE_Summary" -namespace "root\CIMV2\Applications\MicrosoftIE" `
-#	-computername $strComputer
 
 	$objItem = @($colItems)[0];
-	write-host "###########################################################"  	-foregroundcolor White -backgroundcolor DarkGreen	
-	write-host "# Date:           " (Get-Date)		  						 	-foregroundcolor White -backgroundcolor DarkGreen	
-	write-host "# Computer:       " $strComputer								-foregroundcolor White -backgroundcolor DarkGreen	
-	write-host "# Version:        " $ieversion									-foregroundcolor White -backgroundcolor DarkGreen	
-	write-host "# URL:            " $url										-foregroundcolor White -backgroundcolor DarkGreen	
-	write-host "###########################################################"	-foregroundcolor White -backgroundcolor DarkGreen	
-	
+	$url = $config['url'];
+	$date = Get-Date;
+	$testBanner = 
+	"###########################################################",
+	"# Date:          $date",
+	"# Computer:      $strComputer",
+	"# Version:       $ieversion",
+	"# URL:           $url",
+	"###########################################################"
+
+	foreach ($line in $testBanner) {
+		Write-Host $line -foregroundcolor White -backgroundcolor DarkGreen
+		Write-TapLog $line
+	}
+
 	Add-HtmlLogEntry -t 'bannerStart'
 	Add-HtmlLogEntry -t 'bannerEntry' -label "Date" -value (Get-Date)
 	Add-HtmlLogEntry -t 'bannerEntry' -label "Computer" -value $strComputer
@@ -50,6 +56,7 @@ function Write-Banner( $url)
 	Add-HtmlLogEntry -t 'bannerEntry' -label "URL" -value $url
 	Add-HtmlLogEntry -t 'bannerEnd' 
 	Write-HtmlLog
+
 }
 
 ###########################################################
@@ -70,44 +77,29 @@ function Write-TAPComment( $str, $type="")
 	{
 		$color = 'Red'
 		write-host "# ERROR: " -NoNewline   -foregroundcolor $color
+		Write-TapLog "# ERROR:  $str"
 	}
 	elseif( $type -eq 'trace')
 	{
 		$color = 'Yellow'
 		write-host "# TRACE: " -NoNewline   -foregroundcolor $color
+		Write-TapLog "# TRACE:  $str"
 	}
 	else
 	{
 		$color = "White"
 		write-host "# " -NoNewline   -foregroundcolor $color
+		Write-TapLog "# $str"
 	}
 	
-	write-host $str  -foregroundcolor $color
 }
 
 ###########################################################
 Set-Alias trace Trace-Message
-function Trace-Message
+function Trace-Message ( $text=$null )
 {
-	param( 
-		[alias("t")][string]$text=$null, 
-		[switch]$on, 
-		[switch]$off
-	)
-	
-	if( $on)
-	{
-		$script:trace = $true
-	}
-	
-	if( $script:trace -and $text)
-	{
+	if ($script:trace) {
 		tapComment "$($testScript):$testLine $text" -type "trace"
-	}
-	
-	if( $off)
-	{
-		$script:trace = $false
 	}
 }
 
@@ -141,11 +133,13 @@ function Write-TAPTestResult( $pass, $description)
 {
 	if( $pass)
 	{
-		write-host "ok $testCount -" "$testScript`:$testLine $testName $description"  -foregroundcolor green
+		write-host   "ok $testCount -" "$testScript`:$testLine $testName $description" -foregroundcolor green 
+		write-taplog "ok $testCount - $testScript`:$testLine $testName $description"
 	}
 	else
 	{
-		write-host "not ok $testCount -" "$testScript`:$testLine $description"  -foregroundcolor red
+		write-host   "not ok $testCount -" "$testScript`:$testLine $description" -foregroundcolor red | write-taplog 
+		write-taplog "not ok $testCount - $testScript`:$testLine $description"
 	}
 }	
 
@@ -160,7 +154,7 @@ function Write-HtmlTestResult( $pass, $description)
 	
 	if( $pass)
 	{
-		Add-HtmlLogEntry -t 'testEntry' -l "ok" -v $description
+		Add-HtmlLogEntry 'testEntry' -l "ok" -v $description
 	}
 	else
 	{
@@ -274,7 +268,6 @@ function Add-HtmlLogEntry
 		$html += '<style>'
 		$html += 'table{border-style:none;border-width:0px;font-size:8pt;background-color:#ccc;width:100%;}'
 		$html += 'th{text-align:right;}'
-		#$output += 'td{background-color:#fff;border-style:dotted;border-width:1px;}'
 		$html += 'td.thumb{height:200px; float:right;}'
 		$html += 'tr.testEntry td.pass, td.fail{width:50px}'
 		$html += 'td.pass{background-color:#00FF00;}'
@@ -318,7 +311,7 @@ function Show-HtmlLog
     ...  
 #>  
 Set-Alias screenshot Write-Screenshot
-function Write-Screenshot( $description, [switch]$noLog)
+function Write-Screenshot( $description, [switch]$noLog=$false)
 {
 	if( !$noLog)
 	{
@@ -343,6 +336,12 @@ function Write-Screenshot( $description, [switch]$noLog)
 	{
 		Add-HtmlLogEntry -t "screenshot" -v $description
 	}
+	Write-TapLog "# screenshot: $ssFileName"
+}
+
+function Write-TapLog( $str )
+{
+	$str | Out-File "$logFileName.log" -Append -Force
 }
 
 function Write-HtmlLog
