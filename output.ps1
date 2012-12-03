@@ -76,30 +76,47 @@ function Write-TAPComment( $str, $type="")
 	if( $type -eq 'error')
 	{
 		$color = 'Red'
-		write-host "# ERROR: " -NoNewline   -foregroundcolor $color
+		write-host "# ERROR: " -NoNewline -foregroundcolor $color
 		Write-TapLog "# ERROR:  $str"
 	}
 	elseif( $type -eq 'trace')
 	{
 		$color = 'Yellow'
-		write-host "# TRACE: " -NoNewline   -foregroundcolor $color
+		write-host "# TRACE: " -NoNewline -foregroundcolor $color
 		Write-TapLog "# TRACE:  $str"
 	}
 	else
 	{
 		$color = "White"
-		write-host "# " -NoNewline   -foregroundcolor $color
+		write-host "# " -NoNewline -foregroundcolor $color
 		Write-TapLog "# $str"
 	}
+	write-host $str -foregroundcolor $color
 	
 }
 
 ###########################################################
 Set-Alias trace Trace-Message
-function Trace-Message ( $text=$null )
+function Trace-Message ()
 {
-	if ($script:trace) {
+	param(
+		[alias("t")][string]$text=$null,
+		[switch]$on,
+		[switch]$off
+	)
+
+	if ($on)
+	{
+		$script:trace = $true
+	}
+	
+	if ($script:trace -and $text) {
 		tapComment "$($testScript):$testLine $text" -type "trace"
+	}
+
+	if ($off)
+	{
+		$script:trace = $false
 	}
 }
 
