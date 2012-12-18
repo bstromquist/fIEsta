@@ -898,7 +898,6 @@ function Set-ElementValue #( $id, $val)
 			{
 				trace "select combobox id='$($el.id)' item $idx"
 				$el.selectedIndex = $idx
-				[void]$el.fireEvent( "onchange")
 			}
 			else
 			{
@@ -910,6 +909,9 @@ function Set-ElementValue #( $id, $val)
 		{
 			$el.value = $text
 		}
+		# fire an onchange event here
+		[void]$el.fireEvent( "onchange")
+
 	}
 	else
 	{
