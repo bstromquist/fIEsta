@@ -225,12 +225,14 @@ function Set-PauseScript( $title)
     ...  
 #>  
 Set-Alias selectTab Select-BrowserTab
-function Select-BrowserTab( $title, [switch]$noLog=$false)
+function Select-BrowserTab( $title)
 {
 	$try = 0
 	$ie2 = $null
 	
-	if( !$noLog)
+	$caller = $MyInvocation.ScriptName.split("\")[-1].split(".")[0]
+
+	if( $caller -ne "fiesta") 
 	{
 		# only do this if called from a user's script
 		$script:testScript = $MyInvocation.ScriptName.split("\")[-1].split(".")[0]
