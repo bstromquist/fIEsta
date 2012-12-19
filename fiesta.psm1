@@ -705,7 +705,7 @@ function Send-Click
 	
 	if( $tab)
 	{
-		Select-BrowserTab $tab $true
+		Select-BrowserTab $tab
 		return
 	}
 
@@ -915,9 +915,13 @@ function Set-ElementValue #( $id, $val)
 		{
 			$el.value = $text
 		}
-		# fire an onchange event here
-		[void]$el.fireEvent( "onchange")
-
+		
+		if( $result)
+		{
+			# fire onkeyup and onchange events here so listeners know data has changed
+			[void]$el.fireEvent( "onkeyup")
+			[void]$el.fireEvent( "onchange")
+		}
 	}
 	else
 	{
