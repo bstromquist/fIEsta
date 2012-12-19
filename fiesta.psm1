@@ -225,14 +225,18 @@ function Set-PauseScript( $title)
     ...  
 #>  
 Set-Alias selectTab Select-BrowserTab
-function Select-BrowserTab( $title)
+function Select-BrowserTab( $title, [switch]$noLog=$false)
 {
 	$try = 0
 	$ie2 = $null
 	
-	$script:testScript = $MyInvocation.ScriptName.split("\")[-1].split(".")[0]
-	$script:testLine = $MyInvocation.ScriptLineNumber
-	$script:cmdLine = $MyInvocation.Line
+	if( !$noLog)
+	{
+		# only do this if called from a user's script
+		$script:testScript = $MyInvocation.ScriptName.split("\")[-1].split(".")[0]
+		$script:testLine = $MyInvocation.ScriptLineNumber
+		$script:cmdLine = $MyInvocation.Line
+	}
 	
 	trace "Search for handle $mainHandle with text '$title'"
 	
@@ -699,7 +703,7 @@ function Send-Click
 	
 	if( $tab)
 	{
-		Select-BrowserTab( $tab)
+		Select-BrowserTab $tab $true
 		return
 	}
 
