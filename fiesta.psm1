@@ -121,6 +121,24 @@ function Initialize-Script ( $config=$defaultCfg )
 
 	# Create an ie com object
 	trace "Launching IE..."
+	Open-IE
+
+}
+
+###########################################################
+<#  
+.SYNOPSIS  
+	Open Internet Explorer
+.DESCRIPTION
+    
+.PARAMETER x
+    ...
+.EXAMPLE 
+    ...  
+#> 
+Set-Alias open Open-IE
+function Open-IE 
+{
 	$ie = New-Object -com internetexplorer.application
 	$ie.top = 0
 	$ie.left = 0
@@ -143,7 +161,7 @@ function Initialize-Script ( $config=$defaultCfg )
 	}
 
 }
-
+	
 ###########################################################
 <#  
 .SYNOPSIS  
@@ -155,7 +173,7 @@ function Initialize-Script ( $config=$defaultCfg )
 .EXAMPLE 
     ...  
 #> 
-Set-Alias close Initialize-Script
+Set-Alias close Close-IE
 function Close-IE 
 {
 		# close all IE instances
@@ -959,7 +977,8 @@ function Test-Assertion
 		                 [switch]$title,
 		   [alias("nf")] [switch]$notFound,
 		   [alias("v")]  [switch]$visible,
-		   [alias("nv")]  [switch]$notVisible
+		   [alias("nv")]  [switch]$notVisible,
+		   [alias("d")]  [switch]$dump=$false
 		   )
 		   
 	$script:testScript = $MyInvocation.ScriptName.split("\")[-1].split(".")[0]
@@ -1004,6 +1023,15 @@ function Test-Assertion
 	}
 	
 	Write-TestResult $result 
+
+	# if the -d flag is used, the result object is returned
+	# the return value can be read into a variable
+	#	$return = test -d -i "box3"
+	# if no variable is used it will dump the object to the console
+	if ( $dump )
+	{
+		return $result
+	}
 }
 
 <###########################################################
