@@ -1043,6 +1043,7 @@ Export-ModuleMember -Alias * -Function *
 ###########################################################
 . $psScriptRoot\support.ps1
 . $psScriptRoot\output.ps1
+Export-ModuleMember -Alias * -Function Trace-Message
 
 ###########################################################
 . $psScriptRoot\Get-Screenshot.ps1
