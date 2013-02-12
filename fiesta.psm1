@@ -553,12 +553,14 @@ function Wait-Text
 		   [alias("rav")][string]$rootAttrValue=$null,
 		   [alias("ne" )][switch]$ignoreError,
 		   [alias("l"  )][string]$limit=2,
-		   [alias("IE" )][switch]$IEBusy
+		   [alias("IE" )][switch]$IEBusy,
+		   [alias("v")]  [switch]$visible
 		   )
 	
 	if( $IEBusy)
 	{
 		waitForIE
+		Write-TestResult $true
 		return
 	}
 	
@@ -570,6 +572,7 @@ function Wait-Text
 	{
 		trace "Waiting for $limit seconds."
 		Start-Sleep -milliseconds (1000 * $limit)
+		Write-TestResult $true
 		return
 	}
 
@@ -600,6 +603,27 @@ function Wait-Text
 		Start-Sleep -Milliseconds 1000
 	}
 	while (!$el -and ( $count -lt $limit))
+	
+	if( $el -and $visible)
+	{
+		# verify the element can be seen
+		trace "testing visiblity of $($el.tag) element id = '$($el.id)' text = '$($el.innerText)'"
+		if( ($el.offsetWidth -gt 0) -or ($el.offsetHeight -gt 0))
+		{
+			trace "element is visible (offsetWidth or height is not 0"
+		}
+		elseif( $el.currentStyle.visibility -ne 'hidden')
+		{
+			trace "element is not visible (style indicates not 'hidden')"
+			$el = $null
+		}
+		else
+		{
+			trace "element failed visibility test"
+			trace "element current visibility style = '$($el.currentStyle.visibility)'"
+			$el = $null
+		}
+	}
 	
 	if( !$el)
 	{
@@ -640,7 +664,8 @@ function Wait-NoText
 		   [alias("rt")] [string]$rootTag=$null,
 		   [alias("ra")] [string]$rootAttr=$null,
 		   [alias("rav")][string]$rootAttrValue=$null,
-		   [alias("l"  )][string]$limit=2
+		   [alias("l"  )][string]$limit=2,
+		   [alias("nv")]  [switch]$notVisible
 		   )
 	
 	$script:testScript = $MyInvocation.ScriptName.split("\")[-1].split(".")[0]
@@ -666,6 +691,28 @@ function Wait-NoText
 			else
 			{
 				trace "text match passed"
+			}
+		}
+	
+		if( $el -and $notVisible)
+		{
+			# check if the element can be not be seen
+			trace "testing visiblity of $($el.tag) element id = '$($el.id)' text = '$($el.innerText)'"
+			
+			if( ($el.offsetWidth -eq 0) -or ($el.offsetHeight -eq 0))
+			{
+				trace "element is not visible (width or height is 0)"
+				$el = $null
+			}
+			elseif( $el.currentStyle.visibility -eq 'hidden')
+			{
+				trace "element is not visible (style indicates 'hidden')"
+				$el = $null
+			}
+			else
+			{
+				trace "element failed invisibility test"
+				trace "element current visibility style = '$($el.currentStyle.visibility)'"
 			}
 		}
 		
@@ -845,7 +892,7 @@ function Send-Click
     ...  
 #>  
 Set-Alias fill Set-ElementValue
-function Set-ElementValue #( $id, $val)
+function Set-ElementValue 
 {
  	param( [alias("i"  )][string]$id=$null,
 		   [alias("t"  )][string]$text=$null,
@@ -1008,13 +1055,42 @@ function Test-Assertion
 		$el = $result
 		trace "testing visiblity of $($e.tag) element id = '$($el.id)' text = '$($el.innerText)'"
 		$result = ($el.offsetWidth -gt 0) -or ($el.offsetHeight -gt 0)
+		
+		if( ($el.offsetWidth -gt 0) -or ($el.offsetHeight -gt 0))
+		{
+			trace "element is visible (offsetWidth or height is not 0"
+		}
+		elseif( $el.currentStyle.visibility -ne 'hidden')
+		{
+			trace "element is not visible (style indicates not 'hidden')"
+		}
+		else
+		{
+			trace "element failed visibility test"
+			trace "element current visibility style = '$($el.currentStyle.visibility)'"
+			$result = $false
+		}
 	}
 
 	if( $notVisible -and $result)
 	{
 		$el = $result
 		trace "testing invisiblity of $($e.tag) element id = '$($el.id)' text = '$($el.innerText)'"
-		$result = ! $el -or ( ($el.offsetWidth -eq 0) -and ($el.offsetHeight -eq 0) )
+
+		if( !$el -or ($el.offsetWidth -eq 0) -or ($el.offsetHeight -eq 0))
+		{
+			trace "element is not visible (offsetWidth or height is 0)"
+		}
+		elseif( $el.currentStyle.visibility -eq 'hidden')
+		{
+			trace "element is not visible (style indicates 'hidden')"
+		}
+		else
+		{
+			trace "element failed invisibility test"
+			trace "element current visibility style = '$($el.currentStyle.visibility)'"
+			$result = $false
+		}
 	}
 			
 	if( $notFound)
@@ -1044,6 +1120,7 @@ Export-ModuleMember -Alias * -Function *
 . $psScriptRoot\support.ps1
 . $psScriptRoot\output.ps1
 Export-ModuleMember -Alias * -Function Trace-Message
+Export-ModuleMember -Alias * -Function Write-Comment
 
 ###########################################################
 . $psScriptRoot\Get-Screenshot.ps1
