@@ -282,7 +282,7 @@ function Select-BrowserTab( $title)
 		}
 		
 		$try ++
-		if ($try -gt 2) #60) 
+		if ($try -gt 10) #2) #60) 
 		{
 			break;
 		}
