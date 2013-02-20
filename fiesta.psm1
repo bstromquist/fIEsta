@@ -53,6 +53,7 @@ $logFileName = ""
 $showHtmlLog = $true
 $autoSnap = $true
 $sectionOutput = $null
+$logDir = $null
 
 
 ###########################################################
@@ -1121,6 +1122,9 @@ Export-ModuleMember -Alias * -Function *
 . $psScriptRoot\output.ps1
 Export-ModuleMember -Alias * -Function Trace-Message
 Export-ModuleMember -Alias * -Function Write-Comment
+Export-ModuleMember -Alias * -Variable testCount
+Export-ModuleMember -Alias * -Variable passCount
+Export-ModuleMember -Alias * -Variable logDir
 
 ###########################################################
 . $psScriptRoot\Get-Screenshot.ps1
